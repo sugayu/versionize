@@ -8,7 +8,7 @@ from packaging.version import Version as _Version
 import json
 from logging import getLogger
 
-__all__ = ['Version']
+__all__ = ['Version', 'VersionFlow']
 logger = getLogger('versionize')
 
 
@@ -16,10 +16,11 @@ logger = getLogger('versionize')
 class Version:
     '''Versionize main class.
 
+    This class is presumed to be used in tasks.
     This class controles three types of versions:
-    - version_code:
-    - version_flow:
-    - version_record:
+    - version_code: a version of a script code
+    - version_record: a version of a file/files recorded in .metaversion
+    - version_flow: a version of the pipeline flow
     '''
 
     metafilename = '.metaversion'
@@ -29,11 +30,14 @@ class Version:
 
     def __init__(
         self,
-        version_code: str,
+        version_code: str | _Version,
         dirname: str | Path,
         dirname_root: str = _dirname_root,
     ) -> None:
-        self.version_code = version_code
+        if isinstance(version_code, _Version):
+            self.version_code = version_code
+        else:
+            self.version_code = _Version(version_code)
         self.dirname_root = Path(dirname_root)
         self._dirname = dirname
         self._meta: dict = {}
@@ -49,19 +53,21 @@ class Version:
 
             @wraps(func)
             def versionized_wrapper(
-                *args, version_flow: str = self.version_code, **kwargs
+                *args, version_flow: str | _Version = self.version_code, **kwargs
             ):
                 version_record = self.get_version_of(tag)
-                new_version = max(_Version(version_flow), _Version(self.version_code))
-                logger.debug(f'version_record={version_record}')
-                logger.debug(f'version_code={self.version_code}')
-                logger.debug(f'version_flow={version_flow}')
+                if isinstance(version_flow, str):
+                    version_flow = _Version(version_flow)
+                new_version: _Version = max(version_flow, self.version_code)
+                logger.debug(f'version_record={str(version_record)}')
+                logger.debug(f'version_code={str(self.version_code)}')
+                logger.debug(f'version_flow={str(version_flow)}')
 
-                if _Version(version_record) >= new_version:
+                if version_record >= new_version:
                     if skip:
                         msg = (
-                            f'{func.__module__}.{func.__name__}(): '
-                            f'The version {version_record} is the latest. Skip the task.'
+                            f'The version {version_record} of {tag} is the latest. '
+                            f'Skip {func.__module__}.{func.__name__}().'
                         )
                         logger.info(msg)
                         return
@@ -73,14 +79,14 @@ class Version:
                 # Main function
                 value = func(*args, savepath=savepath, **kwargs)
 
-                self.up(tag, new_version)
+                self.update(tag, new_version)
                 return value
 
             return versionized_wrapper
 
         return _decorator
 
-    def up(self, tag: str, new_version: str | _Version) -> None:
+    def update(self, tag: str, new_version: str | _Version) -> None:
         '''Update version records.'''
         if isinstance(new_version, _Version):
             new_version = str(new_version)
@@ -115,9 +121,9 @@ class Version:
             self._meta = self._read(self.directory)
         return self._meta
 
-    def get_version_of(self, tag: str) -> str:
+    def get_version_of(self, tag: str) -> _Version:
         '''Get a version recoreded in a meta file.'''
-        return self.meta.get(tag, self.version_initial)
+        return _Version(self.meta.get(tag, self.version_initial))
 
     def to_directory(self, version: str | _Version) -> Path:
         vdir = self.to_dirname(version)
@@ -148,3 +154,24 @@ class Version:
         p = pwd / self.metafilename
         with p.open('w') as f:
             json.dump(meta, f)
+
+
+class VersionFlow:
+    '''Return the highest version in the pipeline flow.
+
+    This class is presumed to be used in pipelines.
+
+    NOTE:
+        This class is thought to be used like a function,
+        but it makes use of a side effect.
+    '''
+
+    def __init__(self, version_initial: str) -> None:
+        self.current_version = _Version(version_initial)
+
+    def __call__(self, version_flow: str | _Version) -> str:
+        if isinstance(version_flow, str):
+            version_flow = _Version(version_flow)
+        new_version = max(self.current_version, version_flow)
+        self.current_version = new_version
+        return str(new_version)
