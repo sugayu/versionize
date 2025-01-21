@@ -1,0 +1,12 @@
+[tool.black]
+skip-string-normalization = true
+
+[tool.mypy]
+
+[[tool.mypy.overrides]]
+module = [
+       'scipy.*',
+       'astropy.*',
+       'matplotlib.*',
+]
+ignore_missing_imports = true
