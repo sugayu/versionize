@@ -1,1 +1,1 @@
-from .core import Version
+from .core import Version, VersionFlow

@@ -1,1 +1,1 @@
-This is Task 2: input = 4
+This is Task 2: input = 2
