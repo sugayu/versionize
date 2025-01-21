@@ -17,7 +17,7 @@ class Version:
     '''Versionize main class.
 
     This class is presumed to be used in tasks.
-    This class controles three types of versions:
+    This class controls three types of versions:
     - version_code: a version of a script code
     - version_record: a version of a file/files recorded in .metaversion
     - version_flow: a version of the pipeline flow
