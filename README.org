@@ -1,4 +1,49 @@
 #+title: Versionize
 
-Control the workflow of the programs by adding versionized metafiles to saved directories.
+Simple version control of codes and results by adding metafiles to saved directories.
 
+* Example
+An code example and its outputs are given in the ~example/~ directory.
+
+** Register tasks
+Let's register a task using ~Version~.
+#+begin_src python
+  from pathlib import Path
+  from versionize import Version
+
+  __version__ = '1.0.1'
+  dir_save = 'task1/'
+  version = Version(__version__, dir_save)
+
+  @version.decorator('filesave.txt')
+  def main(a, savepath: Path):
+      with savepath.open('w') as f:
+          f.write(f'This is Task 1: input = {a}')
+#+end_src
+
+The output of ~main()~ will be stored in the directory ~results/v1/task1/filesave.txt~.
+Namely, ~Version~ implicitly sets the root directory ~results/~,
+decides the major version directory ~v1~ from the script version (~__version__~),
+make a directory to summarize outputs of this script (~task1/~),
+and provides a path to a output file (~filesave.txt~).
+At the same time, ~Version~ controls versions of the outputs by writing ~.metaversion~ files at ~results/~ and ~results/v1/task1/~.
+
+** Make a pipeline
+In a pipeline, you can describe the order of the tasks.
+#+begin_src python
+  from versionize import VersionFlow
+  import task1
+  import task2
+
+  __version__ = '1.0.0'
+
+  def main() -> None:
+      '''Main function of the pipeline.'''
+      vflow = VersionFlow(__version__)
+
+      task1.main(4, version_flow=vflow.current_version)
+      task2.main(2, version_flow=vflow(task1.__version__))
+#+end_src
+~task1.main~ can receive an additional argument ~version_flow~, which is automatically added by ~@Version.decorator()~.
+This argument is used to pass versions of input data or previous analysis codes.
+~VersionFlow~ gives the highest versions among the previous codes.

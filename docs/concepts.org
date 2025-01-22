@@ -1,6 +1,7 @@
 #+title: Concepts of ~versionize~
 
 * Procedure in a task application
+Use the ~Version~ class.
 1. Get a version of the application code. (~__init__~)
 2. Get a name of a save directory. (~__init__~)
 3. Get a name of a root directory (e.g., results/) of the save directory. (~__init__~ or in the application)
@@ -10,6 +11,6 @@
 7. Know a version of the recorded file. (~get_version_of()~ in ~decorator~)
 8. Get a version of the pipeline flow. (~decorator~)
 9. Decide to run or not to run (~decorator~)
-10. Provide a path of the file to save, which has information of a correct major version (~decorator~)
+10. Provide a path of the file to save, which has information of a correct major version (~to_directory()~ in ~decorator~)
 11. Do the task (~main~)
-12. Record the current version (~up()~)
+12. Record the current version (~update()~)
