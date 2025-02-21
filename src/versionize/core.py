@@ -99,7 +99,7 @@ class Version:
 
                 if version_flow.is_dryrun is True:  # dryrun
                     self.dryrun(tag, new_version)
-                    return return_values
+                    value = return_values
 
                 else:  # Main routine
                     value = func(*args, savepath=savepath, **kwargs)
