@@ -1,10 +1,11 @@
 '''Core contents of versionize package.
 '''
 
-from typing import Callable
+from typing import Callable, Self
 from functools import wraps
 from pathlib import Path
 from packaging.version import Version as _Version
+import copy
 import json
 from logging import getLogger
 
@@ -53,15 +54,21 @@ class Version:
 
             @wraps(func)
             def versionized_wrapper(
-                *args, version_flow: str | _Version = self.version_code, **kwargs
+                *args,
+                version_flow: str | _Version | VersionFlow = self.version_code,
+                **kwargs,
             ):
                 version_record = self.get_version_of(tag)
+                if isinstance(version_flow, _Version):
+                    _version_flow = version_flow
                 if isinstance(version_flow, str):
-                    version_flow = _Version(version_flow)
-                new_version: _Version = max(version_flow, self.version_code)
+                    _version_flow = _Version(version_flow)
+                if isinstance(version_flow, VersionFlow):
+                    _version_flow = version_flow.current_version
+                new_version: _Version = max(_version_flow, self.version_code)
                 logger.debug(f'version_record={str(version_record)}')
                 logger.debug(f'version_code={str(self.version_code)}')
-                logger.debug(f'version_flow={str(version_flow)}')
+                logger.debug(f'version_flow={str(_version_flow)}')
 
                 if version_record >= new_version:
                     if skip:
@@ -80,6 +87,8 @@ class Version:
                 value = func(*args, savepath=savepath, **kwargs)
 
                 self.update(tag, new_version)
+                if isinstance(version_flow, VersionFlow):
+                    version_flow(new_version)
                 return value
 
             return versionized_wrapper
@@ -117,8 +126,7 @@ class Version:
 
     @property
     def meta(self) -> dict:
-        if not self._meta:
-            self._meta = self._read(self.directory)
+        self._meta = self._read(self.directory)
         return self._meta
 
     def get_version_of(self, tag: str) -> _Version:
@@ -169,9 +177,13 @@ class VersionFlow:
     def __init__(self, version_initial: str) -> None:
         self.current_version = _Version(version_initial)
 
-    def __call__(self, version_flow: str | _Version) -> str:
+    def __call__(self, version_flow: str | _Version) -> Self:
         if isinstance(version_flow, str):
             version_flow = _Version(version_flow)
         new_version = max(self.current_version, version_flow)
         self.current_version = new_version
-        return str(new_version)
+        return self
+
+    def branch(self) -> Self:
+        '''Copy myself to make a branch of the flow.'''
+        return copy.deepcopy(self)

@@ -16,19 +16,19 @@ import task2
 mylogconfig()
 logger = getLogger(__name__)
 
-__version__ = '1.0.0'
+__major_version__ = '1.0.0'
 
 
 ##
 def main() -> None:
     '''Main function of the pipeline.'''
-    vflow = VersionFlow(__version__)
+    vflow = VersionFlow(__major_version__)
 
     a = 4
-    task1.main(a, version_flow=vflow.current_version)
+    task1.main(a, version_flow=vflow)
 
     b = 2
-    task2.main(b, version_flow=vflow(task1.__version__))
+    task2.main(b, version_flow=vflow)
 
 
 if __name__ == '__main__':
