@@ -93,17 +93,18 @@ class Version:
                         f'Skip {func.__module__}.{func.__name__}().'
                     )
                     logger.info(msg)
-                    return return_values
-
-                dsave.mkdir(exist_ok=True, parents=True)
-
-                if version_flow.is_dryrun is True:  # dryrun
-                    self.dryrun(tag, new_version)
                     value = return_values
 
-                else:  # Main routine
-                    value = func(*args, savepath=savepath, **kwargs)
-                    self.update(tag, new_version)
+                else:
+                    dsave.mkdir(exist_ok=True, parents=True)
+
+                    if version_flow.is_dryrun is True:  # dryrun
+                        self.dryrun(tag, new_version)
+                        value = return_values
+
+                    else:  # Main routine
+                        value = func(*args, savepath=savepath, **kwargs)
+                        self.update(tag, new_version)
 
                 version_flow(new_version)
                 return value
@@ -211,3 +212,7 @@ class VersionFlow:
     def branch(self) -> Self:
         '''Copy myself to make a branch of the flow.'''
         return copy.deepcopy(self)
+
+    @property
+    def versionlog(self) -> str:
+        return f'Running pipeline version: v{self.current_version}'
