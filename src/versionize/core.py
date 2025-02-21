@@ -47,7 +47,12 @@ class Version:
 
         self.dirname_root.mkdir(exist_ok=True)
 
-    def decorator(self, tag: str, skip: bool = True) -> Callable:
+    def decorator(
+        self,
+        tag: str,
+        always_run: bool = False,
+        returned_at: str | tuple[str, ...] | None = None,
+    ) -> Callable:
         '''Decorator for taks functions.'''
 
         def _decorator(func) -> Callable:
@@ -55,40 +60,52 @@ class Version:
             @wraps(func)
             def versionized_wrapper(
                 *args,
-                version_flow: str | _Version | VersionFlow = self.version_code,
+                version_flow: VersionFlow | None = None,
                 **kwargs,
             ):
                 version_record = self.get_version_of(tag)
-                if isinstance(version_flow, _Version):
-                    _version_flow = version_flow
-                if isinstance(version_flow, str):
-                    _version_flow = _Version(version_flow)
-                if isinstance(version_flow, VersionFlow):
-                    _version_flow = version_flow.current_version
-                new_version: _Version = max(_version_flow, self.version_code)
+
+                if version_flow is None:
+                    version_flow = VersionFlow(str(self.version_code))
+                version_current = version_flow.current_version
+
                 logger.debug(f'version_record={str(version_record)}')
                 logger.debug(f'version_code={str(self.version_code)}')
-                logger.debug(f'version_flow={str(_version_flow)}')
+                logger.debug(f'version_flow={str(version_current)}')
 
-                if version_record >= new_version:
-                    if skip:
-                        msg = (
-                            f'The version {version_record} of {tag} is the latest. '
-                            f'Skip {func.__module__}.{func.__name__}().'
-                        )
-                        logger.info(msg)
-                        return
-
+                # New versions
+                new_version: _Version = max(version_current, self.version_code)
                 dsave = self.to_directory(new_version)
-                dsave.mkdir(exist_ok=True, parents=True)
                 savepath = dsave / tag
 
-                # Main function
-                value = func(*args, savepath=savepath, **kwargs)
+                # Return values
+                return_values: None | tuple[Path, ...] | Path
+                if returned_at is None:
+                    return_values = None
+                elif isinstance(returned_at, tuple):
+                    return_values = tuple(Path(str(savepath) + r) for r in returned_at)
+                else:
+                    return_values = Path(str(savepath) + returned_at)
 
-                self.update(tag, new_version)
-                if isinstance(version_flow, VersionFlow):
-                    version_flow(new_version)
+                if (version_record >= new_version) and (not always_run):
+                    msg = (
+                        f'The version {version_record} of {tag} is the latest. '
+                        f'Skip {func.__module__}.{func.__name__}().'
+                    )
+                    logger.info(msg)
+                    return return_values
+
+                dsave.mkdir(exist_ok=True, parents=True)
+
+                if version_flow.is_dryrun is True:  # dryrun
+                    self.dryrun(tag, new_version)
+                    return return_values
+
+                else:  # Main routine
+                    value = func(*args, savepath=savepath, **kwargs)
+                    self.update(tag, new_version)
+
+                version_flow(new_version)
                 return value
 
             return versionized_wrapper
@@ -108,6 +125,12 @@ class Version:
         meta[tag] = new_version
         self._write(directory, meta)
         logger.info(f'Version updated: {tag} = {new_version}')
+
+    def dryrun(self, tag: str, new_version: str | _Version) -> None:
+        '''Dryrun of a pipeline and tasks.'''
+        if isinstance(new_version, _Version):
+            new_version = str(new_version)
+        logger.info(f'(Dryrun) Version updated: {tag} = {new_version}')
 
     @property
     def version_root(self) -> str:
@@ -176,6 +199,7 @@ class VersionFlow:
 
     def __init__(self, version_initial: str) -> None:
         self.current_version = _Version(version_initial)
+        self.is_dryrun = False
 
     def __call__(self, version_flow: str | _Version) -> Self:
         if isinstance(version_flow, str):
