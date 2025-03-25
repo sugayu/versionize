@@ -127,13 +127,19 @@ class Version:
         meta = self._read(directory)
         meta[tag] = new_version
         self._write(directory, meta)
-        logger.info(f'Version updated: {tag} = {new_version}')
+        logger.info(
+            'Version updated: '
+            f'{self.dirname_root.name} {self.directory.name} {tag} = {new_version}'
+        )
 
     def dryrun(self, tag: str, new_version: str | _Version) -> None:
         '''Dryrun of a pipeline and tasks.'''
         if isinstance(new_version, _Version):
             new_version = str(new_version)
-        logger.info(f'(Dryrun) Version updated: {tag} = {new_version}')
+        logger.info(
+            '(Dryrun) Version updated: '
+            f'{self.dirname_root.name} {self.directory.name} {tag} = {new_version}'
+        )
 
     @property
     def version_root(self) -> str:
