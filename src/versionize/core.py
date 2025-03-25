@@ -51,7 +51,7 @@ class Version:
         self,
         tag: str,
         always_run: bool = False,
-        returned_at: str | tuple[str, ...] | None = None,
+        returns: str | tuple[str, ...] | bool = False,
     ) -> Callable:
         '''Decorator for taks functions.'''
 
@@ -80,12 +80,14 @@ class Version:
 
                 # Return values
                 return_values: None | tuple[Path, ...] | Path
-                if returned_at is None:
-                    return_values = None
-                elif isinstance(returned_at, tuple):
-                    return_values = tuple(Path(str(savepath) + r) for r in returned_at)
+                if returns is True:
+                    return_values = savepath
+                elif isinstance(returns, tuple):
+                    return_values = tuple(Path(str(savepath) + r) for r in returns)
+                elif isinstance(returns, str):
+                    return_values = Path(str(savepath) + returns)
                 else:
-                    return_values = Path(str(savepath) + returned_at)
+                    return_values = None
 
                 if (version_record >= new_version) and (not always_run):
                     msg = (
