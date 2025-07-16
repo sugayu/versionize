@@ -89,24 +89,34 @@ class Version:
                 else:
                     return_values = None
 
-                if (version_record >= new_version) and (not always_run):
+                is_new = new_version > version_record
+                do_parallel = version_flow.do_parallel(new_version)
+                if always_run or is_new or do_parallel:
+                    dsave.mkdir(exist_ok=True, parents=True)
+
+                    if version_flow.is_dryrun:  # dryrun
+                        self.dryrun(tag, new_version)
+                        value = return_values
+
+                    else:  # Main routine
+                        value = func(*args, savepath=savepath, **kwargs)
+                        if is_new:
+                            self.update(tag, new_version)
+                        elif always_run:
+                            self.stay(tag, new_version, always_run=True)
+                        elif do_parallel:
+                            self.stay(tag, new_version, do_parallel=True)
+
+                    if version_flow.in_parallel:
+                        version_flow.set_parallel(new_version)
+
+                else:
                     msg = (
                         f'The version {version_record} of {tag} is the latest. '
                         f'Skip {func.__module__}.{func.__name__}().'
                     )
                     logger.info(msg)
                     value = return_values
-
-                else:
-                    dsave.mkdir(exist_ok=True, parents=True)
-
-                    if version_flow.is_dryrun is True:  # dryrun
-                        self.dryrun(tag, new_version)
-                        value = return_values
-
-                    else:  # Main routine
-                        value = func(*args, savepath=savepath, **kwargs)
-                        self.update(tag, new_version)
 
                 version_flow(new_version)
                 return value
@@ -131,6 +141,23 @@ class Version:
             'Version updated: '
             f'{self.dirname_root.name} {self.directory.name} {tag} = {new_version}'
         )
+
+    def stay(
+        self,
+        tag,
+        new_version: str | _Version,
+        always_run: bool = False,
+        do_parallel: bool = False,
+    ) -> None:
+        '''Stay version records.'''
+        if isinstance(new_version, _Version):
+            new_version = str(new_version)
+
+        info = f'{self.dirname_root.name} {self.directory.name} {tag} = {new_version}'
+        if always_run:
+            logger.info(f'Always run: {info}')
+        if do_parallel:
+            logger.info(f'Parallel run: {info}')
 
     def dryrun(self, tag: str, new_version: str | _Version) -> None:
         '''Dryrun of a pipeline and tasks.'''
@@ -209,6 +236,9 @@ class VersionFlow:
     def __init__(self, version_initial: str) -> None:
         self.current_version = _Version(version_initial)
         self.is_dryrun = False
+        self.in_parallel = False
+        self.version_start_parallel = _Version('9999.0.0')
+        self.version_parallel = _Version('9999.0.0')
 
     def __call__(self, version_flow: str | _Version) -> Self:
         if isinstance(version_flow, str):
@@ -217,10 +247,26 @@ class VersionFlow:
         self.current_version = new_version
         return self
 
-    def branch(self) -> Self:
+    def branch(self, parallel: bool = False) -> Self:
         '''Copy myself to make a branch of the flow.'''
-        return copy.deepcopy(self)
+        new = copy.deepcopy(self)
+        new.in_parallel = parallel
+        if parallel:
+            new.version_start_parallel = self.current_version
+        return new
 
     @property
     def versionlog(self) -> str:
         return f'Running pipeline version: v{self.current_version}'
+
+    def do_parallel(self, new_version) -> bool:
+        return new_version >= self.version_parallel
+
+    def set_parallel(self, new_version) -> None:
+        if new_version < self.version_parallel:
+            self.version_parallel = new_version
+
+    def parallelback(self) -> None:
+        if self.version_start_parallel == _Version('9999.0.0'):
+            raise ValueError('Not in parallel run.')
+        self.current_version = self.version_start_parallel
